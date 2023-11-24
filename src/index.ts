@@ -7,81 +7,77 @@ export interface Env {
 
 export default {
 	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+		const portList = env.PORTS.split(',');
 
-		const portList = env.PORTS.split(',')
-
-		const dns_lookup = await fetch(
-		`https://cloudflare-dns.com/dns-query?name=${env.DOMAIN_NAME}&type=A`,{
+		const dns_lookup = await fetch(`https://cloudflare-dns.com/dns-query?name=${env.DOMAIN_NAME}&type=A`, {
 			headers: {
-				'accept': "application/dns-json",
+				accept: 'application/dns-json',
 			},
 		});
 		const dnsResponse: DnsResponse = await dns_lookup.json();
 
 		let ipAddress = '';
 		if (dnsResponse.Answer && dnsResponse.Answer.length > 0) {
-				ipAddress = dnsResponse.Answer[0].data;
+			ipAddress = dnsResponse.Answer[0].data;
 		}
 
-		let rules = compileRules(ipAddress, portList)
+		let rules = compileRules(ipAddress, portList);
 
-		const time = new Date()
+		const time = new Date();
 
 		const firewallInitResp = await fetch(`https://api.hetzner.cloud/v1/firewalls/${env.FIREWALL_ID}`, {
 			method: 'PUT',
 			headers: {
 				Authorization: 'Bearer ' + env.HETZNER_API_TOKEN,
-				'Content-Type': 'application/json'
+				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				name: 'DDNS Cloudflare' + time.toISOString()
-			})
-		}
-		)
+				name: 'DDNS Cloudflare' + time.toISOString(),
+			}),
+		});
 
 		if (firewallInitResp.status !== 200) {
-			console.log('Failed to init Firewall: ' + await firewallInitResp.text())
-			throw 'Failed to init Firewall'
+			console.log('Failed to init Firewall: ' + (await firewallInitResp.text()));
+			throw 'Failed to init Firewall';
 		}
 
 		const finalResp = await fetch(`https://api.hetzner.cloud/v1/firewalls/${env.FIREWALL_ID}/actions/set_rules`, {
 			method: 'POST',
 			headers: {
 				Authorization: 'Bearer ' + env.HETZNER_API_TOKEN,
-				'Content-Type': 'application/json'
+				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
-				rules
-			})
+				rules,
+			}),
 		});
 		if (finalResp.status !== 201) {
-			console.log('Failed to set Firewall Rules: ' + await finalResp.text())
-			throw 'Failed to set Firewall Rules'
+			console.log('Failed to set Firewall Rules: ' + (await finalResp.text()));
+			throw 'Failed to set Firewall Rules';
 		}
 	},
 };
 
 function compileRules(ip: string, ports: string[]) {
-	const builtRules: BuiltRule[] = []
+	const builtRules: BuiltRule[] = [];
 
-
-	ports.forEach(port => {
+	ports.forEach((port) => {
 		builtRules.push({
 			direction: 'in',
 			source_ips: [`${ip}/32`],
 			protocol: 'tcp',
-			port
-		})
-	})
+			port,
+		});
+	});
 
-	return builtRules
+	return builtRules;
 }
 
 export interface BuiltRule {
-	direction: string
-	source_ips: string[]
-	protocol: string
-	port: string
+	direction: string;
+	source_ips: string[];
+	protocol: string;
+	port: string;
 }
 
 interface DnsResponse {
