@@ -55,7 +55,10 @@ export default {
 			console.log('Failed to set Firewall Rules: ' + (await finalResp.text()));
 			throw 'Failed to set Firewall Rules';
 		}
-	},
+		else {
+			return Promise.resolve();
+		}
+	}
 };
 
 function compileRules(ip: string, ports: string[]) {
